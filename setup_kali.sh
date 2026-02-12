@@ -45,11 +45,17 @@ fi
 # --- Pre-flight Checks ---
 info "Checking for port conflicts..."
 # Stop containers on port 80 or 443
-if docker ps --format '{{.Ports}}' | grep -qE '0.0.0.0:(80|443)'; then
-    warn "Ports 80/443 are in use by existing containers. Force removing them..."
-    docker rm -f $(docker ps -q --filter "publish=443") > /dev/null 2>&1
-    docker rm -f $(docker ps -q --filter "publish=80") > /dev/null 2>&1
-    success "Conflicting containers removed."
+# Stop containers on port 80 or 443
+if command -v docker >/dev/null 2>&1; then
+    if docker ps --format '{{.Ports}}' | grep -qE '0.0.0.0:(80|443)'; then
+        warn "Ports 80/443 are in use by existing containers. Force removing them..."
+        docker rm -f $(docker ps -q --filter "publish=443") > /dev/null 2>&1
+        docker rm -f $(docker ps -q --filter "publish=80") > /dev/null 2>&1
+        success "Conflicting containers removed."
+    fi
+else
+    # Docker not installed yet - skipping check
+    :
 fi
 
 # Kill host processes listening on ports 80 or 443 (avoiding ESTABLISHED connections)
@@ -213,7 +219,7 @@ open_firefox_robust() {
                 env_vars="$env_vars $var='$val'"
             fi
         done
-        sudo -u "$user" bash -c "export $env_vars; nohup firefox --new-tab '$url' >/dev/null 2>&1 & disown"
+        sudo -u "$user" bash -c "export $env_vars; nohup firefox --new-tab '$url' >/home/kali/firefox_launch.log 2>&1 & disown"
     else
         echo "[*] Firefox not running. Starting new instance..."
         local disp=":0"
@@ -221,7 +227,7 @@ open_firefox_robust() {
         if [ -n "$x_pid" ]; then
              disp=$(grep -z "^DISPLAY=" "/proc/$x_pid/environ" | cut -d= -f2- | tr -d '\0')
         fi
-        sudo -u "$user" bash -c "export DISPLAY=$disp; nohup firefox '$url' >/dev/null 2>&1 & disown"
+        sudo -u "$user" bash -c "export DISPLAY=$disp; nohup firefox '$url' >/home/kali/firefox_launch.log 2>&1 & disown"
     fi
 }
 
@@ -296,3 +302,31 @@ if sudo -u kali rclone lsd drive: > /dev/null 2>&1; then
 else
     warn "Skipping mount attempt (Not Authenticated). Please see instructions above."
 fi
+
+echo ""
+echo "================================================================"
+success "SETUP COMPLETE!"
+echo "================================================================"
+echo ""
+echo "----------------------------------------------------------------"
+echo "NEXT STEPS: Chrome Remote Desktop Authorization"
+echo "----------------------------------------------------------------"
+echo "1. On your LOCAL/HOST computer, go to:"
+echo "   https://remotedesktop.google.com/headless"
+echo "2. Sign in, click 'Begin' -> 'Next' -> 'Authorize'."
+echo "3. Copy the 'Debian Linux' command (starts with DISPLAY= /opt/...)"
+echo "4. Paste it into this terminal as user 'kali':"
+echo ""
+echo -e "${RED}╔══════════════════════════════════════╗${NC}"
+echo -e "${RED}║   STOP! SWITCH TO USER 'KALI' NOW!   ║${NC}"
+echo -e "${RED}╚══════════════════════════════════════╝${NC}"
+echo "   Run: ${GREEN}su - kali${NC}"
+echo "   Then Paste Code: ${GREEN}<PASTE_COMMAND>${NC}"
+echo ""
+echo "5. Set your PIN when prompted."
+echo "----------------------------------------------------------------"
+echo ""
+
+
+
+
