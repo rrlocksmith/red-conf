@@ -202,24 +202,54 @@ info "Configuring Google Drive..."
 sudo -u kali rclone config create drive drive scope drive config_is_local false > /dev/null 2>&1
 
 # 2. Force authentication to get the token (URL + Verification Code)
-echo ""
-warn "ACTION REQUIRED: Google Drive Authentication"
-echo "--------------------------------------------------------"
-echo "1. A URL will be displayed below."
-echo "2. Open it in your browser and sign in."
-echo "3. Copy the verification code."
-echo "4. Paste the code here when prompted."
-echo "--------------------------------------------------------"
-echo ""
-sudo -u kali rclone config reconnect drive:
+# We prompt only if config is missing or broken, but let's just attempt a listing check first.
+if ! sudo -u kali rclone lsd drive: > /dev/null 2>&1; then
+    echo ""
+    warn "ACTION REQUIRED: Google Drive Authentication"
+    echo "--------------------------------------------------------"
+    echo "1. A URL will be displayed below."
+    echo "2. Open it in your browser and sign in."
+    echo "3. Copy the verification code."
+    echo "4. Paste the code here when prompted."
+    echo "--------------------------------------------------------"
+    echo ""
+    sudo -u kali rclone config reconnect drive:
+fi
 
 info "Mounting Google Drive..."
 mkdir -p /home/kali/GoogleDrive
 chown kali:kali /home/kali/GoogleDrive
 
-# Mount as user kali.
-sudo -u kali rclone mount drive: /home/kali/GoogleDrive --daemon --vfs-cache-mode writes
-success "Drive mounted at: /home/kali/GoogleDrive"
+# Mount loop
+MAX_RETRIES=3
+for i in $(seq 1 $MAX_RETRIES); do
+    if mount | grep -q "drive:"; then
+        success "Drive is already mounted."
+        break
+    fi
+
+    # Attempt mount
+    sudo -u kali rclone mount drive: /home/kali/GoogleDrive --daemon --vfs-cache-mode writes --allow-non-empty
+    
+    # Wait for daemon
+    echo "[*] Waiting for mount to initialize..."
+    sleep 5
+
+    if mount | grep -q "drive:"; then
+        success "Drive mounted successfully at: /home/kali/GoogleDrive"
+        break
+    else
+        if [ "$i" -eq "$MAX_RETRIES" ]; then
+            error "Failed to mount Google Drive after $MAX_RETRIES attempts."
+            warn "Please try running manually: sudo -u kali rclone mount drive: /home/kali/GoogleDrive --daemon --vfs-cache-mode writes"
+        else
+            warn "Mount check failed. Retrying ($i/$MAX_RETRIES)..."
+            # Kill any zombie rclone processes just in case
+            pkill -u kali rclone || true
+            sleep 2
+        fi
+    fi
+done
 
 echo ""
 echo "================================================================"
@@ -239,4 +269,9 @@ echo "   <PASTE_COMMAND>"
 echo "5. Set your PIN when prompted."
 echo "----------------------------------------------------------------"
 echo ""
+
+# Launch Firefox for "Keep Awake" extension
+info "Launching Firefox to install 'Keep Awake' extension..."
+sudo -u kali nohup firefox "https://addons.mozilla.org/en-US/firefox/addon/keep-awake-screen-only/" > /dev/null 2>&1 &
+
 
