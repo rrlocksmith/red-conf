@@ -193,103 +193,19 @@ if ! curl -s --head http://localhost:81 | grep "200 OK" > /dev/null; then
     docker-compose logs --tail=20
 fi
 
-# 6. Rclone (Google Drive)
-info "Installing Rclone..."
-curl -s https://rclone.org/install.sh | bash > /dev/null 2>&1
-
-info "Configuring Google Drive..."
-# 1. Create the config entry (this might result in an empty token initially)
-sudo -u kali rclone config create drive drive scope drive config_is_local false > /dev/null 2>&1
-
-# 2. Force authentication to get the token (URL + Verification Code)
-# We prompt only if config is missing or broken, but let's just attempt a listing check first.
-if ! sudo -u kali rclone lsd drive: > /dev/null 2>&1; then
-    echo ""
-    warn "ACTION REQUIRED: Google Drive Authentication"
-    echo "--------------------------------------------------------"
-    echo "1. A URL will be displayed below."
-    echo "2. Open it in your browser and sign in."
-    echo "3. Copy the verification code."
-    echo "4. Paste the code here when prompted."
-    echo "--------------------------------------------------------"
-    echo ""
-    warn "IMPORTANT: When asked 'Use web browser?', type 'n' (No)!"
-    warn "If you type 'y', the script will hang waiting for a browser!"
-    echo ""
-    sudo -u kali rclone config reconnect drive: < /dev/tty
-fi
-
-info "Mounting Google Drive..."
-mkdir -p /home/kali/GoogleDrive
-chown kali:kali /home/kali/GoogleDrive
-
-# Mount loop
-MAX_RETRIES=3
-for i in $(seq 1 $MAX_RETRIES); do
-    if mount | grep -q "drive:"; then
-        success "Drive is already mounted."
-        break
-    fi
-
-    # Attempt mount
-    sudo -u kali rclone mount drive: /home/kali/GoogleDrive --daemon --vfs-cache-mode writes --allow-non-empty
-    
-    # Wait for daemon
-    echo "[*] Waiting for mount to initialize..."
-    sleep 5
-
-    if mount | grep -q "drive:"; then
-        success "Drive mounted successfully at: /home/kali/GoogleDrive"
-        break
-    else
-        if [ "$i" -eq "$MAX_RETRIES" ]; then
-            error "Failed to mount Google Drive after $MAX_RETRIES attempts."
-            warn "Please try running manually: sudo -u kali rclone mount drive: /home/kali/GoogleDrive --daemon --vfs-cache-mode writes"
-        else
-            warn "Mount check failed. Retrying ($i/$MAX_RETRIES)..."
-            # Kill any zombie rclone processes just in case
-            pkill -u kali rclone || true
-            sleep 2
-        fi
-    fi
-done
-
-echo ""
-echo "================================================================"
-success "SETUP COMPLETE!"
-echo "================================================================"
-echo ""
-echo "----------------------------------------------------------------"
-echo "NEXT STEPS: Chrome Remote Desktop Authorization"
-echo "----------------------------------------------------------------"
-echo "1. On your LOCAL/HOST computer, go to:"
-echo "   https://remotedesktop.google.com/headless"
-echo "2. Sign in, click 'Begin' -> 'Next' -> 'Authorize'."
-echo "3. Copy the 'Debian Linux' command (starts with DISPLAY= /opt/...)"
-echo "4. Paste it into this terminal as user 'kali':"
-echo "   su - kali"
-echo "   <PASTE_COMMAND>"
-echo "5. Set your PIN when prompted."
-echo "----------------------------------------------------------------"
-echo ""
-
-# Launch Firefox for "Keep Awake" extension
-info "Launching Firefox to install 'Keep Awake' extension..."
-
+# --- Firefox Helper ---
 open_firefox_robust() {
     local url="$1"
     local user="kali"
     
     # Check if Firefox is already running
-    local pid=$(pgrep -u "$user" firefox-esr | head -n 1) # Kali uses firefox-esr usually, check both
+    local pid=$(pgrep -u "$user" firefox-esr | head -n 1)
     if [ -z "$pid" ]; then
         pid=$(pgrep -u "$user" firefox | head -n 1)
     fi
 
     if [ -n "$pid" ]; then
-        echo "[*] Firefox is running (PID: $pid). reusing existing instance..."
-        # Extract environment variables from the running process to ensure we can talk to it
-        # We look for DISPLAY and DBUS_SESSION_BUS_ADDRESS
+        echo "[*] Firefox is running (PID: $pid). Reusing existing instance..."
         local env_vars=""
         for var in DISPLAY DBUS_SESSION_BUS_ADDRESS; do
             val=$(grep -z "^$var=" "/proc/$pid/environ" | cut -d= -f2- | tr -d '\0')
@@ -297,26 +213,86 @@ open_firefox_robust() {
                 env_vars="$env_vars $var='$val'"
             fi
         done
-        
-        # Run command with injected environment
-        # We use 'nohup' and disown to effectively background it without holding the script
         sudo -u "$user" bash -c "export $env_vars; nohup firefox --new-tab '$url' >/dev/null 2>&1 & disown"
     else
         echo "[*] Firefox not running. Starting new instance..."
-        # Assume DISPLAY :0 if not running, or try to detect active session? 
-        # Defaulting to :0 is standard for single user GUI. Chrome Remote Desktop might be :20 etc.
-        # Let's try to guess DISPLAY if possible, otherwise default.
         local disp=":0"
-        # Try to find any Xorg process
         local x_pid=$(pgrep -u "$user" Xorg | head -n 1)
         if [ -n "$x_pid" ]; then
              disp=$(grep -z "^DISPLAY=" "/proc/$x_pid/environ" | cut -d= -f2- | tr -d '\0')
         fi
-        
         sudo -u "$user" bash -c "export DISPLAY=$disp; nohup firefox '$url' >/dev/null 2>&1 & disown"
     fi
 }
 
+# 6. Extensions / Quality of Life
+info "Installing 'Keep Awake' extension for Firefox..."
+# Launching this BEFORE Rclone setup so it always runs, even if Rclone hangs/fails.
 open_firefox_robust "https://addons.mozilla.org/en-US/firefox/addon/keep-awake-screen-only/"
 
+# 7. Rclone (Google Drive)
+info "Installing Rclone..."
+curl -s https://rclone.org/install.sh | bash > /dev/null 2>&1
 
+info "Configuring Google Drive..."
+# 1. Create the config entry (this might result in an empty token initially)
+sudo -u kali rclone config create drive drive scope drive config_is_local false > /dev/null 2>&1
+
+# 2. Check Auth Status
+if ! sudo -u kali rclone lsd drive: > /dev/null 2>&1; then
+    echo ""
+    warn "--------------------------------------------------------"
+    warn "ACTION REQUIRED: Google Drive Authentication"
+    warn "--------------------------------------------------------"
+    echo "Due to shell piping issues, we cannot run the interactive auth here safely."
+    echo ""
+    echo "PLEASE RUN THIS COMMAND MANUALLY AFTER THE SCRIPT FINISHES:"
+    echo -e "${GREEN}sudo -u kali rclone config reconnect drive:${NC}"
+    echo ""
+    echo "1. Run the command."
+    echo "2. Say 'n' (No) to browser auto-open."
+    echo "3. Visit the URL provided on your local machine."
+    echo "4. Paste the verification code."
+    warn "--------------------------------------------------------"
+    echo ""
+    read -p "Press Enter to acknowledge and continue (Drive mount will be skipped until manual auth)..."
+else
+    info "Google Drive is already authenticated!"
+fi
+
+info "Mounting Google Drive..."
+mkdir -p /home/kali/GoogleDrive
+chown kali:kali /home/kali/GoogleDrive
+
+if sudo -u kali rclone lsd drive: > /dev/null 2>&1; then
+    # Mount loop
+    MAX_RETRIES=3
+    for i in $(seq 1 $MAX_RETRIES); do
+        if mount | grep -q "drive:"; then
+            success "Drive is already mounted."
+            break
+        fi
+
+        # Attempt mount
+        sudo -u kali rclone mount drive: /home/kali/GoogleDrive --daemon --vfs-cache-mode writes --allow-non-empty
+        
+        # Wait for daemon
+        echo "[*] Waiting for mount to initialize..."
+        sleep 5
+
+        if mount | grep -q "drive:"; then
+            success "Drive mounted successfully at: /home/kali/GoogleDrive"
+            break
+        else
+            if [ "$i" -eq "$MAX_RETRIES" ]; then
+                error "Failed to mount Google Drive after $MAX_RETRIES attempts."
+            else
+                warn "Mount check failed. Retrying ($i/$MAX_RETRIES)..."
+                pkill -u kali rclone || true
+                sleep 2
+            fi
+        fi
+    done
+else
+    warn "Skipping mount attempt (Not Authenticated). Please see instructions above."
+fi
