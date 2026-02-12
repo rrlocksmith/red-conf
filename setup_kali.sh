@@ -55,24 +55,7 @@ fi
 echo ""
 info "Starting Kali Setup..."
 
-# ... (omitted sections) ...
 
-# Launch NPM
-cd "$NPM_DIR"
-docker-compose up -d > /dev/null 2>&1
-
-# Verify NPM Startup
-info "Verifying Nginx Proxy Manager startup..."
-sleep 5 # Give it a moment to initialize
-if curl -s --head http://localhost:81 | grep "200 OK" > /dev/null; then
-    success "Nginx Proxy Manager started successfully."
-    echo "    - GUI: http://localhost:81"
-    echo "    - Default Creds: admin@example.com / changeme"
-else
-    error "Nginx Proxy Manager failed to start or is not reachable on port 81."
-    warn "Checking logs..."
-    docker-compose logs --tail=10
-fi
 
 # 1. Change Passwords
 # 1. Change Passwords
