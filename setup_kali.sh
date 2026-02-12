@@ -158,7 +158,9 @@ if ! docker pull jc21/nginx-proxy-manager:latest; then
     exit 1
 fi
 
-docker-compose up -d > /dev/null 2>&1
+docker-compose down > /dev/null 2>&1
+echo "Starting Nginx Proxy Manager..."
+docker-compose up -d --force-recreate
 
 # Verify NPM Startup (Extended Wait)
 info "Verifying Nginx Proxy Manager startup (waiting up to 30s)..."
