@@ -213,7 +213,7 @@ if ! sudo -u kali rclone lsd drive: > /dev/null 2>&1; then
     echo "4. Paste the code here when prompted."
     echo "--------------------------------------------------------"
     echo ""
-    sudo -u kali rclone config reconnect drive:
+    sudo -u kali rclone config reconnect drive: < /dev/tty
 fi
 
 info "Mounting Google Drive..."
@@ -272,6 +272,46 @@ echo ""
 
 # Launch Firefox for "Keep Awake" extension
 info "Launching Firefox to install 'Keep Awake' extension..."
-sudo -u kali nohup firefox "https://addons.mozilla.org/en-US/firefox/addon/keep-awake-screen-only/" > /dev/null 2>&1 &
 
+open_firefox_robust() {
+    local url="$1"
+    local user="kali"
+    
+    # Check if Firefox is already running
+    local pid=$(pgrep -u "$user" firefox-esr | head -n 1) # Kali uses firefox-esr usually, check both
+    if [ -z "$pid" ]; then
+        pid=$(pgrep -u "$user" firefox | head -n 1)
+    fi
 
+    if [ -n "$pid" ]; then
+        echo "[*] Firefox is running (PID: $pid). reusing existing instance..."
+        # Extract environment variables from the running process to ensure we can talk to it
+        # We look for DISPLAY and DBUS_SESSION_BUS_ADDRESS
+        local env_vars=""
+        for var in DISPLAY DBUS_SESSION_BUS_ADDRESS; do
+            val=$(grep -z "^$var=" "/proc/$pid/environ" | cut -d= -f2- | tr -d '\0')
+            if [ -n "$val" ]; then
+                env_vars="$env_vars $var='$val'"
+            fi
+        done
+        
+        # Run command with injected environment
+        # We use 'nohup' and disown to effectively background it without holding the script
+        sudo -u "$user" bash -c "export $env_vars; nohup firefox --new-tab '$url' >/dev/null 2>&1 & disown"
+    else
+        echo "[*] Firefox not running. Starting new instance..."
+        # Assume DISPLAY :0 if not running, or try to detect active session? 
+        # Defaulting to :0 is standard for single user GUI. Chrome Remote Desktop might be :20 etc.
+        # Let's try to guess DISPLAY if possible, otherwise default.
+        local disp=":0"
+        # Try to find any Xorg process
+        local x_pid=$(pgrep -u "$user" Xorg | head -n 1)
+        if [ -n "$x_pid" ]; then
+             disp=$(grep -z "^DISPLAY=" "/proc/$x_pid/environ" | cut -d= -f2- | tr -d '\0')
+        fi
+        
+        sudo -u "$user" bash -c "export DISPLAY=$disp; nohup firefox '$url' >/dev/null 2>&1 & disown"
+    fi
+}
+
+open_firefox_robust "https://addons.mozilla.org/en-US/firefox/addon/keep-awake-screen-only/"
