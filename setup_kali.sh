@@ -18,7 +18,7 @@ if [ -z "$1" ]; then
 fi
 
 NEW_PASS="$1"
-TMUX_URL="https://raw.githubusercontent.com/rrlocksmith/ts-tmux-conf/refs/heads/main/.tmux.conf"
+TMUX_URL="https://raw.githubusercontent.com/rrlocksmith/tmux/refs/heads/main/.tmux2.conf"
 
 echo "[*] Starting Kali Setup..."
 
