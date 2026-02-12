@@ -80,9 +80,21 @@ if ! grep -q "alias ll='ls -la'" /home/kali/.bashrc; then
     echo "alias ll='ls -la'" >> /home/kali/.bashrc
     chown kali:kali /home/kali/.bashrc
 fi
+if [ -f /home/kali/.zshrc ]; then
+    if ! grep -q "alias ll='ls -la'" /home/kali/.zshrc; then
+        echo "alias ll='ls -la'" >> /home/kali/.zshrc
+        chown kali:kali /home/kali/.zshrc
+    fi
+fi
+
 # For Root User
 if ! grep -q "alias ll='ls -la'" /root/.bashrc; then
     echo "alias ll='ls -la'" >> /root/.bashrc
+fi
+if [ -f /root/.zshrc ]; then
+    if ! grep -q "alias ll='ls -la'" /root/.zshrc; then
+        echo "alias ll='ls -la'" >> /root/.zshrc
+    fi
 fi
 echo "[+] Aliases updated."
 
