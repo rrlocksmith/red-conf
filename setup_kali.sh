@@ -145,7 +145,13 @@ EOF
 chown -R kali:kali "$NPM_DIR"
 
 # Launch NPM
+
 cd "$NPM_DIR"
+
+# Explicitly create data directories with broad permissions to avoid container mapping issues
+mkdir -p data letsencrypt
+chmod -R 777 data letsencrypt
+
 info "Pulling Nginx Proxy Manager image..."
 if ! docker pull jc21/nginx-proxy-manager:latest; then
     error "Failed to pull Nginx Proxy Manager image. Check your internet connection."
@@ -154,17 +160,25 @@ fi
 
 docker-compose up -d > /dev/null 2>&1
 
-# Verify NPM Startup
-info "Verifying Nginx Proxy Manager startup..."
-sleep 5 # Give it a moment to initialize
-if curl -s --head http://localhost:81 | grep "200 OK" > /dev/null; then
-    success "Nginx Proxy Manager started successfully."
-    echo "    - GUI: http://localhost:81"
-    echo "    - Default Creds: admin@example.com / changeme"
-else
+# Verify NPM Startup (Extended Wait)
+info "Verifying Nginx Proxy Manager startup (waiting up to 30s)..."
+for i in {1..15}; do
+    if curl -s --head http://localhost:81 | grep "200 OK" > /dev/null; then
+        success "Nginx Proxy Manager started successfully."
+        echo "    - GUI: http://localhost:81"
+        echo "    - Default Creds: admin@example.com / changeme"
+        break
+    fi
+    sleep 2
+done
+
+# Final check if loop finished without success
+if ! curl -s --head http://localhost:81 | grep "200 OK" > /dev/null; then
     error "Nginx Proxy Manager failed to start or is not reachable on port 81."
-    warn "Checking logs..."
-    docker-compose logs --tail=10
+    warn "Container Status:"
+    docker ps -a --filter "ancestor=jc21/nginx-proxy-manager:latest"
+    warn "Container Logs:"
+    docker-compose logs --tail=20
 fi
 
 # 6. Rclone (Google Drive)
