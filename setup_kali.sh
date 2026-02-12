@@ -118,9 +118,15 @@ echo "[*] Installing Rclone..."
 curl https://rclone.org/install.sh | bash
 
 echo "[*] Configuring Google Drive (Interactive Auth Required)..."
-# Create the config entry as user 'kali' so config is saved in /home/kali/.config/rclone/rclone.conf
-# config_is_local false forces Rclone to print a URL and wait for a verification code (Manual Auth).
+# 1. Create the config entry (this might result in an empty token initially)
 sudo -u kali rclone config create drive drive scope drive config_is_local false
+
+# 2. Force authentication to get the token (URL + Verification Code)
+echo "[*] Initializing Google Drive Authentication..."
+echo "    - You will be asked if you want to use auto config. Answer 'n'."
+echo "    - You will be given a URL. Open it in a browser."
+echo "    - Copy the verification code and paste it here."
+sudo -u kali rclone config reconnect drive:
 
 echo "[*] Mounting Google Drive..."
 mkdir -p /home/kali/GoogleDrive
@@ -147,3 +153,4 @@ echo "   <PASTE_COMMAND>"
 echo "5. Set your PIN when prompted."
 echo "----------------------------------------------------------------"
 echo ""
+
