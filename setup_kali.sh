@@ -20,6 +20,14 @@ fi
 NEW_PASS="$1"
 TMUX_URL="https://raw.githubusercontent.com/rrlocksmith/tmux/refs/heads/main/.tmux2.conf"
 
+# Suppress interactive prompts during upgrades/installation
+export DEBIAN_FRONTEND=noninteractive
+
+# Configure needrestart to automatically restart services if it's installed
+if [ -f /etc/needrestart/needrestart.conf ]; then
+    sed -i "s/#\$nrconf{restart} = 'i';/\$nrconf{restart} = 'a';/" /etc/needrestart/needrestart.conf
+fi
+
 echo "[*] Starting Kali Setup..."
 
 # 1. Change Passwords
