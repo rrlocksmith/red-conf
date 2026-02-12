@@ -146,6 +146,12 @@ chown -R kali:kali "$NPM_DIR"
 
 # Launch NPM
 cd "$NPM_DIR"
+info "Pulling Nginx Proxy Manager image..."
+if ! docker pull jc21/nginx-proxy-manager:latest; then
+    error "Failed to pull Nginx Proxy Manager image. Check your internet connection."
+    exit 1
+fi
+
 docker-compose up -d > /dev/null 2>&1
 
 # Verify NPM Startup
