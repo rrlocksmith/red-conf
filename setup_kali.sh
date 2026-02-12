@@ -52,6 +52,17 @@ if docker ps --format '{{.Ports}}' | grep -qE '0.0.0.0:(80|443)'; then
     success "Conflicting containers removed."
 fi
 
+# Kill host processes listening on ports 80 or 443 (avoiding ESTABLISHED connections)
+for PORT in 80 443; do
+    # Find PIDs of processes LISTENING on the port
+    PIDS=$(lsof -n -i :$PORT -s TCP:LISTEN 2>/dev/null | awk 'NR>1 {print $2}' | sort -u)
+    if [ -n "$PIDS" ]; then
+        warn "Host process(es) listening on port $PORT (PIDs: $(echo $PIDS | tr '\n' ' ')). Killing them..."
+        echo "$PIDS" | xargs -r kill -9 > /dev/null 2>&1
+        success "Process(es) killed on port $PORT."
+    fi
+done
+
 echo ""
 info "Starting Kali Setup..."
 
@@ -129,7 +140,6 @@ info "Deploying Nginx Proxy Manager (GUI)..."
 NPM_DIR="/home/kali/npm"
 mkdir -p "$NPM_DIR"
 cat <<EOF > "$NPM_DIR/docker-compose.yml"
-version: '3.8'
 services:
   app:
     image: 'jc21/nginx-proxy-manager:latest'
