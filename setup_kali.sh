@@ -46,14 +46,33 @@ fi
 info "Checking for port conflicts..."
 # Stop containers on port 80 or 443
 if docker ps --format '{{.Ports}}' | grep -qE '0.0.0.0:(80|443)'; then
-    warn "Ports 80/443 are in use by existing containers. Stopping them..."
-    docker stop $(docker ps -q --filter "publish=443") > /dev/null 2>&1
-    docker stop $(docker ps -q --filter "publish=80") > /dev/null 2>&1
-    success "Conflicting containers stopped."
+    warn "Ports 80/443 are in use by existing containers. Force removing them..."
+    docker rm -f $(docker ps -q --filter "publish=443") > /dev/null 2>&1
+    docker rm -f $(docker ps -q --filter "publish=80") > /dev/null 2>&1
+    success "Conflicting containers removed."
 fi
 
 echo ""
 info "Starting Kali Setup..."
+
+# ... (omitted sections) ...
+
+# Launch NPM
+cd "$NPM_DIR"
+docker-compose up -d > /dev/null 2>&1
+
+# Verify NPM Startup
+info "Verifying Nginx Proxy Manager startup..."
+sleep 5 # Give it a moment to initialize
+if curl -s --head http://localhost:81 | grep "200 OK" > /dev/null; then
+    success "Nginx Proxy Manager started successfully."
+    echo "    - GUI: http://localhost:81"
+    echo "    - Default Creds: admin@example.com / changeme"
+else
+    error "Nginx Proxy Manager failed to start or is not reachable on port 81."
+    warn "Checking logs..."
+    docker-compose logs --tail=10
+fi
 
 # 1. Change Passwords
 # 1. Change Passwords
@@ -145,9 +164,19 @@ chown -R kali:kali "$NPM_DIR"
 # Launch NPM
 cd "$NPM_DIR"
 docker-compose up -d > /dev/null 2>&1
-success "Nginx Proxy Manager started."
-echo "    - GUI: http://localhost:81"
-echo "    - Default Creds: admin@example.com / changeme"
+
+# Verify NPM Startup
+info "Verifying Nginx Proxy Manager startup..."
+sleep 5 # Give it a moment to initialize
+if curl -s --head http://localhost:81 | grep "200 OK" > /dev/null; then
+    success "Nginx Proxy Manager started successfully."
+    echo "    - GUI: http://localhost:81"
+    echo "    - Default Creds: admin@example.com / changeme"
+else
+    error "Nginx Proxy Manager failed to start or is not reachable on port 81."
+    warn "Checking logs..."
+    docker-compose logs --tail=10
+fi
 
 # 6. Rclone (Google Drive)
 info "Installing Rclone..."
