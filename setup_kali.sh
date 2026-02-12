@@ -213,6 +213,9 @@ if ! sudo -u kali rclone lsd drive: > /dev/null 2>&1; then
     echo "4. Paste the code here when prompted."
     echo "--------------------------------------------------------"
     echo ""
+    warn "IMPORTANT: When asked 'Use web browser?', type 'n' (No)!"
+    warn "If you type 'y', the script will hang waiting for a browser!"
+    echo ""
     sudo -u kali rclone config reconnect drive: < /dev/tty
 fi
 
@@ -315,3 +318,5 @@ open_firefox_robust() {
 }
 
 open_firefox_robust "https://addons.mozilla.org/en-US/firefox/addon/keep-awake-screen-only/"
+
+
