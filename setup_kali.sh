@@ -223,41 +223,8 @@ if ! curl -s --head http://localhost:81 | grep "200 OK" > /dev/null; then
 fi
 
 # --- Firefox Helper ---
-open_firefox_robust() {
-    local url="$1"
-    local user="kali"
-    
-    # Check if Firefox is already running
-    local pid=$(pgrep -u "$user" firefox-esr | head -n 1)
-    if [ -z "$pid" ]; then
-        pid=$(pgrep -u "$user" firefox | head -n 1)
-    fi
-
-    if [ -n "$pid" ]; then
-        echo "[*] Firefox is running (PID: $pid). Reusing existing instance..."
-        local env_vars=""
-        for var in DISPLAY DBUS_SESSION_BUS_ADDRESS; do
-            val=$(grep -z "^$var=" "/proc/$pid/environ" | cut -d= -f2- | tr -d '\0')
-            if [ -n "$val" ]; then
-                env_vars="$env_vars $var='$val'"
-            fi
-        done
-        sudo -u "$user" bash -c "export $env_vars; nohup firefox --new-tab '$url' >/home/kali/firefox_launch.log 2>&1 & disown"
-    else
-        echo "[*] Firefox not running. Starting new instance..."
-        local disp=":0"
-        local x_pid=$(pgrep -u "$user" Xorg | head -n 1)
-        if [ -n "$x_pid" ]; then
-             disp=$(grep -z "^DISPLAY=" "/proc/$x_pid/environ" | cut -d= -f2- | tr -d '\0')
-        fi
-        sudo -u "$user" bash -c "export DISPLAY=$disp; nohup firefox '$url' >/home/kali/firefox_launch.log 2>&1 & disown"
-    fi
-}
-
 # 6. Extensions / Quality of Life
-info "Installing 'Keep Awake' extension for Firefox..."
-# Launching this BEFORE Rclone setup so it always runs, even if Rclone hangs/fails.
-open_firefox_robust "https://addons.mozilla.org/en-US/firefox/addon/keep-awake-screen-only/"
+info "Skipping automated Firefox launch. Links will be provided at the end."
 
 # 7. Rclone (Google Drive)
 info "Installing Rclone..."
@@ -347,6 +314,16 @@ echo "   Run: ${GREEN}su - kali${NC}"
 echo "   Then Paste Code: ${GREEN}<PASTE_COMMAND>${NC}"
 echo ""
 echo "5. Set your PIN when prompted."
+echo "----------------------------------------------------------------"
+echo ""
+echo "----------------------------------------------------------------"
+echo "IMPORTANT LINKS:"
+echo "----------------------------------------------------------------"
+echo -e "1. ${GREEN}Nginx Proxy Manager GUI${NC}: http://localhost:81"
+echo -e "   (Creds: admin@example.com / changeme)"
+echo ""
+echo -e "2. ${GREEN}Firefox Extension (Keep Awake)${NC}:"
+echo "   https://addons.mozilla.org/en-US/firefox/addon/keep-awake-screen-only/"
 echo "----------------------------------------------------------------"
 echo ""
 
