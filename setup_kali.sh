@@ -75,11 +75,34 @@ info "Starting Kali Setup..."
 
 
 # 1. Change Passwords
-# 1. Change Passwords
+set_password() {
+    local user="$1"
+    local pass="$2"
+    
+    echo "$user:$pass" | chpasswd
+    if [ $? -ne 0 ]; then
+        warn "chpasswd failed for $user. Attempting fallback via usermod..."
+        if command -v openssl >/dev/null 2>&1; then
+            local hash=$(openssl passwd -6 "$pass")
+            usermod -p "$hash" "$user"
+            if [ $? -ne 0 ]; then
+                error "Failed to set password for $user (usermod failed)."
+                exit 1
+            else
+                success "Password for $user updated via usermod."
+            fi
+        else
+            error "chpasswd failed and openssl not found. Cannot set password."
+            exit 1
+        fi
+    else
+        success "Password for $user updated."
+    fi
+}
+
 info "Changing passwords for 'root' and 'kali'..."
-echo "root:$NEW_PASS" | chpasswd
-echo "kali:$NEW_PASS" | chpasswd
-success "Passwords updated."
+set_password "root" "$NEW_PASS"
+set_password "kali" "$NEW_PASS"
 
 # 2. System Updates & Dependencies
 info "Installing dependencies (this may take a while)..."
